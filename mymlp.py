@@ -21,13 +21,10 @@ def predict(input):
     out_h = sigmoid(sum_h)              # 1x2
     sum_o = np.dot(out_h, w2) + b2      # 1x1
     result = sigmoid(sum_o)              # 1x1
-    result[result < 0.5] = 0
-    result[result != 0] = 1
+    
     return result
 
 indices = np.random.permutation(len(X))
-
-train_log = []
 
 for epoch in range(50):
     learning_rate = (50-epoch)/50
@@ -66,11 +63,28 @@ for epoch in range(50):
         b2 = b2 - learning_rate*grad_b2
         #print(b2)
 
-    indices = np.random.permutation(len(X))
+    indices = np.random.permutation(len(X)) 
 
-    pr = predict(X)
-    pr = pr.flatten()    
-    train_log.append(np.mean(pr==Y))
+headers = ["x1","x2","y"]
+df = pd.read_csv("Tst.csv", names= headers)
+X_test = df.drop("y", axis=1).to_numpy()
+Y_test = df["y"].to_numpy()
 
-    print("Epoch",epoch)
-    print("Train accuracy:",train_log[-1])
+grid = pd.read_csv("Grid.csv").to_numpy()
+
+pr = predict(X_test).flatten()
+pr[pr < 0.5] = 0
+pr[pr != 0] = 1  
+print("Test accuracy: ", np.mean(pr==Y_test)*100, "%")
+grid_pr = predict(grid).flatten()
+
+import matplotlib.pyplot as plt
+import matplotlib.cm as cm
+import seaborn as sns
+
+col1 = np.where(pr == 1, 'r', 'b')
+col2 = np.where(grid_pr < 0.5, 'midnightblue', np.where(grid_pr < 0.5, 'teal', 
+        np.where(grid_pr < 0.75, 'yellowgreen', 'yellow')))
+plt.scatter(grid.T[0], grid.T[1], c = col2)
+plt.scatter(X_test.T[0], X_test.T[1], c = col1)
+plt.show()

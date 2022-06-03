@@ -7,6 +7,11 @@ Specify the python version and packages used in your code.
 
 # Execute Commands
 
+Install pandas and numpy and then execute the mymlp script
 ```
+pip install pandas
+pip install numpy
+pip install matplotlib
+
 python3 mymlp.py # FIXIT for your task execution
 ```
