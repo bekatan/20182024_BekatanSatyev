@@ -1,126 +1,76 @@
-import numpy as np
 import pandas as pd
+import numpy as np
 
-class Layer:
-    
-    #A building block. Each layer is capable of performing two things:    #- Process input to get output:           output = layer.forward(input)
-    
-    #- Propagate gradients through itself:    grad_input = layer.backward(input, grad_output)
-    
-    #Some layers also have learnable parameters which they update during layer.backward.
-    
-    def __init__(self):
-        # Here we can initialize layer parameters (if any) and auxiliary stuff.
-        # A dummy layer does nothing
-        pass
-    
-    def forward(self, input):
-        # Takes input data of shape [batch, input_units], returns output data [batch, output_units]
-        
-        # A dummy layer just returns whatever it gets as input.
-        return input    
-    
-    def backward(self, input, grad_output):
-        # Performs a backpropagation step through the layer, with respect to the given input.
-        
-        # To compute loss gradients w.r.t input, we need to apply chain rule (backprop):
-        
-        # d loss / d x  = (d loss / d layer) * (d layer / d x)
-        
-        # Luckily, we already receive d loss / d layer as input, so you only need to multiply it by d layer / d x.
-        
-        # If our layer has parameters (e.g. dense layer), we also need to update them here using d loss / d layer
-        
-        # The gradient of a dummy layer is precisely grad_output, but we'll write it more explicitly
-        num_units = input.shape[1]
-        
-        d_layer_d_input = np.eye(num_units)
-        
-        return np.dot(grad_output, d_layer_d_input) # chain rule
+headers = ["x1","x2","y"]
+df = pd.read_csv("Trn.csv", names= headers)
+X = df.drop("y", axis=1).to_numpy()
+Y = df["y"].to_numpy()
 
-class Sigmoid(Layer):
-    def __init__(self):
-        pass
-    
-    def forward(self, input):
-        sigmoid_forward = 1 / (1.0 + np.exp(-input))
-        return sigmoid_forward
-    
-    def backward(self, output, grad_output):
-        sigmoid_backward = output * (1.0 - output)
-        result = grad_output*sigmoid_backward
-        return result 
+w1 = np.random.rand(2, 5) #first matrice of weights
+b1 = np.random.rand(5).reshape(1,5)    #offset1
+w2 = np.random.rand(5, 1) #second matrice of weights
+b2 = np.random.rand(1).reshape(1,1)    #offset2
+learning_rate = 0.1
 
-class Hidden(Layer):
-    def __init__(self, input_units, output_units, learning_rate=0.1):
-        
-        self.learning_rate = learning_rate
-        self.weights = np.random.rand(input_units,output_units)
-        self.offset = np.random.rand(output_units)
 
-    def forward(self,input):
-        h_forward = np.dot(input,self.weights) + self.offset
-        return h_forward
-    
-    def backward(self,input, error):
-        grad_input = np.dot(error, self.weights.T)
-        
-        grad_weights = np.dot(input.T, error)
-        self.weights = self.weights - self.learning_rate * grad_weights
-        self.offset = self.offset - self.learning_rate * error 
-        
-        return grad_input
+def sigmoid(input):
+    return 1/(1+np.exp(-input))
 
-headers = ["x1", "x2", "y"]
-df = pd.read_csv("Trn.csv", names = headers)
+def predict(input):
+    sum_h = np.dot(input, w1) + b1        # 1x2
+    out_h = sigmoid(sum_h)              # 1x2
+    sum_o = np.dot(out_h, w2) + b2      # 1x1
+    result = sigmoid(sum_o)              # 1x1
+    result[result < 0.5] = 0
+    result[result != 0] = 1
+    return result
 
-X_train  = df.drop(["y"], axis=1).to_numpy(dtype = np.float128)[:40]
-Y_train  = df["y"].to_numpy(dtype=int)[:40]
+indices = np.random.permutation(len(X))
 
-mlp = []
-mlp.append(Hidden(2, 3, learning_rate=1))
-mlp.append(Sigmoid())
-mlp.append(Hidden(3, 1, learning_rate=1))
-mlp.append(Sigmoid())
-
-def forward(mlp, X):
-    
-    activations = []
-    input = X
-    for l in mlp:
-        activations.append(l.forward(input))
-        input = activations[-1]
-        
-    assert len(activations) == len(mlp)
-    return activations
-
-def classify(Y):  
-    Y[Y < 0.5] = 0
-    Y[Y != 0] = 1
-    return Y
-    
-def train(network,X,y,index):
-    layer_activations = forward(network,X)
-    layer_inputs = [X] + layer_activations
-    h_i_3 = layer_activations[-1]
-
-    error = h_i_3[index] - y[index]
-    
-    for layer_index in reversed(range(len(network))):
-        layer = network[layer_index]
-        error = layer.backward(layer_inputs[layer_index],error)
-        
 train_log = []
 
-indices = np.random.permutation(len(X_train))
-
-for epoch in range(25):    
+for epoch in range(50):
+    learning_rate = (50-epoch)/50
     for index in indices:
-        train(mlp,X_train,Y_train, index)
-    
-    pr = forward(mlp,X_train)[-1]
-    pr = classify(pr)
-    train_log.append(np.mean(pr==Y_train))
-    
+        cur = X[index].reshape(1,2)  # 1x2
+        #print("1",cur.shape)       
+        sum_h = np.dot(cur, w1) + b1        # 1x2
+        #print("2",sum_h.shape)       
+        out_h = sigmoid(sum_h)              # 1x2
+        #print("3",out_h.shape)       
+        sum_o = np.dot(out_h, w2) + b2      # 1x1
+        #print("4",sum_o.shape)       
+        out_o = sigmoid(sum_o)              # 1x1
+        #print("5",out_o.shapr)       
+        
+        y = Y[index]                        
+        #print("6",y.shape)       
+        e = out_o - y                       # 1x1
+        #print("7",e.shape)       
+        dif_sig1 = out_o * (1 - out_o)      #1x1
+        #print("8",dif_sig1.shape)       
+        grad_w2 = e * dif_sig1 * (out_h.T)    # 2x1
+        #print("9",grad_w2.shape)       
+        grad_b2 = e * dif_sig1              
+        #print("10",grad_b2.shape)           # 1x1
+        dif_sig2 = out_h * (1 - out_h)      # 1x2
+        #print("11",dif_sig2.shape)      
+        grad_b1 = grad_b2 * (w2.T * dif_sig2) #2x1 
+        #print("12",grad_b1.shape)       
+        grad_w1 = np.dot((cur.T), grad_b1)    # 2x2
+        ##print("13",grad_w1.shape)      
+        
+        w1 = w1 - learning_rate*grad_w1
+        w2 = w2 - learning_rate*grad_w2
+        b1 = b1 - learning_rate*grad_b1
+        b2 = b2 - learning_rate*grad_b2
+        #print(b2)
+
+    indices = np.random.permutation(len(X))
+
+    pr = predict(X)
+    pr = pr.flatten()    
+    train_log.append(np.mean(pr==Y))
+
     print("Epoch",epoch)
     print("Train accuracy:",train_log[-1])
